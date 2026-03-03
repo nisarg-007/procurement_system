@@ -54,10 +54,19 @@ def load_user(user_id):
                     role_id=user['role'], role_name=user['role_name'], department_id=user['department_id'])
     return None
 
+from datetime import datetime
+import pytz
+
+# ... existing code ...
+
 def log_audit(user_id, action, table_affected):
     conn = get_db_connection()
-    conn.execute('INSERT INTO Audit_Log (user_id, action, table_affected, ip_address) VALUES (?, ?, ?, ?)',
-                 (user_id, action, table_affected, request.remote_addr))
+    central = pytz.timezone('US/Central')
+    # Get current time in CT, formatted same way SQLite does CURRENT_TIMESTAMP (YYYY-MM-DD HH:MM:SS)
+    ct_time = datetime.now(central).strftime('%Y-%m-%d %H:%M:%S')
+    
+    conn.execute('INSERT INTO Audit_Log (user_id, action, table_affected, ip_address, timestamp) VALUES (?, ?, ?, ?, ?)',
+                 (user_id, action, table_affected, request.remote_addr, ct_time))
     conn.commit()
     conn.close()
 
