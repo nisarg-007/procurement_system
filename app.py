@@ -144,7 +144,11 @@ def dashboard():
 
     elif current_user.role_name == 'SuperAdmin':
         data['departments'] = conn.execute('SELECT * FROM Departments').fetchall()
-        data['audit'] = conn.execute('SELECT a.*, u.email FROM Audit_Log a JOIN Users u ON a.user_id = u.user_id ORDER BY timestamp DESC LIMIT 20').fetchall()
+        data['audit'] = conn.execute('SELECT a.*, u.email FROM Audit_Log a JOIN Users u ON a.user_id = u.user_id ORDER BY timestamp DESC LIMIT 50').fetchall()
+        
+        # SuperAdmin extended analytics logic
+        # For simplicity, returning all POs
+        data['all_pos'] = conn.execute('SELECT status, COUNT(*) as count FROM Purchase_Orders GROUP BY status').fetchall()
 
     conn.close()
     return render_template('dashboard.html', data=data)
@@ -239,6 +243,30 @@ def finance_invoice():
     conn.close()
     log_audit(current_user.id, 'CREATE_INVOICE', 'Invoices')
     flash('Invoice Processed successfully!', 'success')
+    return redirect(url_for('dashboard'))
+
+@app.route('/clear_log/<int:log_id>', methods=['POST'])
+@login_required
+def clear_log(log_id):
+    if current_user.role_name != 'SuperAdmin':
+        return redirect(url_for('dashboard'))
+    conn = get_db_connection()
+    conn.execute('DELETE FROM Audit_Log WHERE log_id = ?', (log_id,))
+    conn.commit()
+    conn.close()
+    flash('Audit log entry removed.', 'success')
+    return redirect(url_for('dashboard'))
+
+@app.route('/clear_all_logs', methods=['POST'])
+@login_required
+def clear_all_logs():
+    if current_user.role_name != 'SuperAdmin':
+        return redirect(url_for('dashboard'))
+    conn = get_db_connection()
+    conn.execute('DELETE FROM Audit_Log')
+    conn.commit()
+    conn.close()
+    flash('All audit logs cleared!', 'success')
     return redirect(url_for('dashboard'))
 
 if __name__ == '__main__':

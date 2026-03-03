@@ -18,41 +18,40 @@
 <!-- Employee Dashboard -->
 {% if current_user.role_name == 'Employee' %}
 <div class="row">
-    <div class="col-lg-4 mb-4">
+    <div class="col-lg-3 mb-4">
         <div class="glass-card h-100">
-            <h4 class="mb-4 text-white">New Purchase Request</h4>
+            <h5 class="mb-4 text-white">New Request</h5>
             <form action="{{ url_for('submit_pr') }}" method="POST">
                 <div class="mb-3">
-                    <label class="form-label text-muted">Item Name</label>
-                    <input type="text" name="item_name" class="form-control" required placeholder="e.g. Dell XPS 15">
+                    <label class="form-label text-muted small">Item Name</label>
+                    <input type="text" name="item_name" class="form-control form-control-sm" required>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label text-muted">Quantity</label>
-                    <input type="number" name="quantity" class="form-control" required min="1">
+                    <label class="form-label text-muted small">Quantity</label>
+                    <input type="number" name="quantity" class="form-control form-control-sm" required min="1">
                 </div>
                 <div class="mb-3">
-                    <label class="form-label text-muted">Estimated Cost (per unit)</label>
-                    <input type="number" step="0.01" name="cost" class="form-control" required>
+                    <label class="form-label text-muted small">Est. Cost (per unit)</label>
+                    <input type="number" step="0.01" name="cost" class="form-control form-control-sm" required>
                 </div>
                 <div class="mb-4">
-                    <label class="form-label text-muted">Business Justification</label>
-                    <textarea name="description" class="form-control" rows="3" required></textarea>
+                    <label class="form-label text-muted small">Justification</label>
+                    <textarea name="description" class="form-control form-control-sm" rows="2" required></textarea>
                 </div>
-                <button type="submit" class="btn btn-primary w-100 py-2">Submit Request</button>
+                <button type="submit" class="btn btn-primary w-100 py-2">Submit</button>
             </form>
         </div>
     </div>
 
-    <div class="col-lg-8 mb-4">
-        <div class="glass-card">
+    <div class="col-lg-6 mb-4">
+        <div class="glass-card h-100">
             <h4 class="mb-4 text-white">Your Request History</h4>
-            <div class="table-responsive">
+            <div class="table-responsive" style="max-height: 400px;">
                 <table class="table table-hover text-white align-middle">
                     <thead>
                         <tr>
                             <th>PR #</th>
                             <th>Item</th>
-                            <th>Qty</th>
                             <th>Est. Total</th>
                             <th>Status</th>
                             <th>Date</th>
@@ -62,20 +61,50 @@
                         {% for req in data.requests %}
                         <tr>
                             <td>PR-100{{ req.pr_id }}</td>
-                            <td class="fw-bold">{{ req.item_name }}</td>
-                            <td>{{ req.quantity }}</td>
+                            <td class="fw-bold">{{ req.item_name }} <span class="text-muted fw-normal">(x{{ req.quantity
+                                    }})</span></td>
                             <td>${{ "%.2f"|format(req.estimated_cost * req.quantity) }}</td>
                             <td>{{ status_badge(req.status) }}</td>
                             <td class="text-muted small">{{ req.created_at[:10] }}</td>
                         </tr>
                         {% else %}
                         <tr>
-                            <td colspan="6" class="text-center text-muted py-4">No requests found.</td>
+                            <td colspan="5" class="text-center text-muted py-4">No requests found.</td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
+        </div>
+    </div>
+
+    <div class="col-lg-3 mb-4">
+        <div class="glass-card h-100">
+            <h5 class="mb-4 text-white">Request Analytics</h5>
+            <canvas id="empChart"></canvas>
+            <script>
+                // Calculate counts in JS to avoid dirty jinja logic
+                const reqStatuses = { 'PENDING': 0, 'APPROVED': 0, 'REJECTED': 0 };
+                {% for r in data.requests %}
+                if (reqStatuses['{{ r.status }}'] !== undefined) {
+                    reqStatuses['{{ r.status }}']++;
+                }
+                {% endfor %}
+
+                const ctxEmp = document.getElementById('empChart').getContext('2d');
+                new Chart(ctxEmp, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Pending', 'Approved', 'Rejected'],
+                        datasets: [{
+                            data: [reqStatuses.PENDING, reqStatuses.APPROVED, reqStatuses.REJECTED],
+                            backgroundColor: ['#6c757d', '#10b981', '#ef4444'],
+                            borderWidth: 0
+                        }]
+                    },
+                    options: { plugins: { legend: { labels: { color: 'white' } } } }
+                });
+            </script>
         </div>
     </div>
 </div>
@@ -370,23 +399,67 @@
             </script>
         </div>
     </div>
-    <div class="col-lg-6 mb-4">
+    <div class="col-lg-5 mb-4">
         <div class="glass-card h-100" style="max-height: 500px; overflow-y: auto;">
-            <h4 class="mb-4 text-white">System Audit Log</h4>
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h4 class="text-white mb-0">System Audit Log</h4>
+                <form action="{{ url_for('clear_all_logs') }}" method="POST">
+                    <button type="submit" class="btn btn-sm btn-outline-danger"
+                        onclick="return confirm('WARNING: Are you sure you want to completely erase the audit history?')">Clear
+                        All</button>
+                </form>
+            </div>
+
             <div class="list-group list-group-flush bg-transparent">
                 {% for log in data.audit %}
-                <div class="list-group-item bg-transparent border-secondary ps-0">
-                    <div class="d-flex w-100 justify-content-between">
-                        <h6 class="mb-1 text-white">{{ log.email }} : <span class="text-info">{{ log.action }}</span>
-                        </h6>
-                        <small class="text-muted">{{ log.timestamp[11:19] }}</small>
+                <div class="list-group-item bg-transparent border-secondary ps-0 pe-0">
+                    <div class="d-flex w-100 justify-content-between align-items-start">
+                        <div>
+                            <h6 class="mb-1 text-white">{{ log.email }} : <span class="text-info">{{ log.action
+                                    }}</span></h6>
+                            <p class="mb-1 text-muted small">Target: {{ log.table_affected }} | IP: {{ log.ip_address }}
+                            </p>
+                        </div>
+                        <div class="text-end">
+                            <small class="text-muted d-block mb-1">{{ log.timestamp[11:19] }}</small>
+                            <form action="{{ url_for('clear_log', log_id=log.log_id) }}" method="POST">
+                                <button type="submit"
+                                    class="btn btn-xs btn-link text-danger p-0 border-0 text-decoration-none"
+                                    style="font-size: 0.75rem;" title="Delete Entry">&#10005; Delete</button>
+                            </form>
+                        </div>
                     </div>
-                    <p class="mb-1 text-muted small">Target: {{ log.table_affected }} | IP: {{ log.ip_address }}</p>
                 </div>
                 {% else %}
                 <p class="text-muted">No logs recorded yet.</p>
                 {% endfor %}
             </div>
+        </div>
+    </div>
+
+    <!-- Third Column: Global PO Pipeline Chart -->
+    <div class="col-lg-3 mb-4">
+        <div class="glass-card h-100">
+            <h4 class="mb-4 text-white">Purchase Orders Flow</h4>
+            <canvas id="allPOsChart"></canvas>
+            <script>
+                const ctxPo = document.getElementById('allPOsChart').getContext('2d');
+                new Chart(ctxPo, {
+                    type: 'pie',
+                    data: {
+                        labels: [
+                            {% for po in data.all_pos %} '{{ po.status }}', {% endfor %}
+                        ],
+                    datasets: [{
+                        data: [
+                            {% for po in data.all_pos %} {{ po.count }}, {% endfor %}
+                ],
+                    backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444']
+                        }]
+                    },
+                    options: { plugins: { legend: { labels: { color: 'white' } } } }
+                });
+            </script>
         </div>
     </div>
 </div>
