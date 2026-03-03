@@ -10,37 +10,31 @@
             <p class="text-muted mb-4">Secure Gateway Authentication</p>
 
             <div id="firebase-ui-container">
-                <!-- Fallback direct login for presentation/grading without Firebase config -->
-                <div class="alert alert-info py-2"
-                    style="font-size:0.85rem; background:rgba(14, 165, 233, 0.1); border-color: rgba(14, 165, 233, 0.4);">
-                    <strong>Grading / Demo Mode:</strong> Use test accounts directly: <br>
-                    employee@test.com, manager@test.com, procurement@test.com, vendor@test.com, finance@test.com,
-                    admin@test.com
+                <div class="alert mb-4 text-start"
+                    style="font-size:0.95rem; background:rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.2); color: #fff;">
+                    <strong>Available Test Accounts:</strong><br>
+                    <ul class="mb-0 mt-2 text-white" style="list-style-type: square; padding-left: 20px;">
+                        <li>employee@test.com</li>
+                        <li>manager@test.com</li>
+                        <li>procurement@test.com</li>
+                        <li>vendor@test.com</li>
+                        <li>finance@test.com</li>
+                        <li>admin@test.com</li>
+                    </ul>
                 </div>
 
-                <form id="demoLogin">
-                    <div class="mb-3 text-start">
-                        <label class="form-label text-muted">Email address</label>
-                        <input type="email" id="demoEmail" class="form-control" placeholder="employee@test.com"
-                            required>
-                    </div>
-                    <button type="submit" class="btn btn-primary w-100 mb-3">Login (Demo/Bypass Firebase)</button>
-                </form>
-
-                <hr class="text-muted border-secondary my-4">
-
-                <p class="text-muted small">Or Use Real Firebase Auth (Configure SDK below if required)</p>
                 <form id="firebaseLogin">
                     <div class="mb-3 text-start">
-                        <label class="form-label text-muted">Firebase Email</label>
-                        <input type="email" id="fbEmail" class="form-control" autocomplete="username">
+                        <label class="form-label text-muted">Email address</label>
+                        <input type="email" id="fbEmail" class="form-control" autocomplete="username" required>
                     </div>
                     <div class="mb-4 text-start">
                         <label class="form-label text-muted">Password</label>
-                        <input type="password" id="fbPassword" class="form-control" autocomplete="current-password">
+                        <input type="password" id="fbPassword" class="form-control" autocomplete="current-password"
+                            required>
                     </div>
-                    <button type="submit" class="btn btn-outline-info w-100">Login with Firebase Auth</button>
-                    <small id="fbError" class="text-danger mt-2 d-block"></small>
+                    <button type="submit" class="btn btn-primary w-100 py-2">Secure Login</button>
+                    <small id="fbError" class="text-danger mt-3 d-block fw-bold"></small>
                 </form>
             </div>
 
@@ -73,24 +67,19 @@
     }
 
     async function loginBackend(email) {
-        try {
-            const resp = await fetch('/api/auth', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: email })
-            });
-            const data = await resp.json();
-            if (data.success) {
-                window.location.href = data.redirect;
-            } else {
-                alert("Login Failed: " + data.error);
-            }
-        } catch (err) {
-            console.error(err);
+        const resp = await fetch('/api/auth', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: email })
+        });
+        const data = await resp.json();
+        if (data.success) {
+            window.location.href = data.redirect;
+        } else {
+            throw new Error(data.error || "Internal access denied.");
         }
     }
 
-    // Firebase Login Form Handler
     document.getElementById('firebaseLogin').addEventListener('submit', async (e) => {
         e.preventDefault();
         const email = document.getElementById('fbEmail').value;
@@ -98,25 +87,24 @@
         const errSpan = document.getElementById('fbError');
 
         if (!auth) {
-            errSpan.innerText = "Firebase config missing. Use Demo login above.";
+            errSpan.innerText = "Firebase not initialized.";
             return;
         }
 
         try {
-            errSpan.innerText = "Authenticating with Firebase...";
+            errSpan.className = "text-info mt-3 d-block fw-bold";
+            errSpan.innerText = "Authenticating securely...";
+
             await signInWithEmailAndPassword(auth, email, password);
-            // Firebase authenticated successfully, now tie to session
+
+            errSpan.innerText = "Verifying Internal Records...";
             await loginBackend(email);
         } catch (error) {
-            errSpan.innerText = "Firebase Error: " + error.message;
+            errSpan.className = "text-danger mt-3 d-block fw-bold";
+            let msg = error.message;
+            if (msg.includes('auth/invalid-credential')) msg = "Incorrect password or email.";
+            errSpan.innerText = "Error: " + msg;
         }
-    });
-
-    // Demo / Grading Login Handler
-    document.getElementById('demoLogin').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const email = document.getElementById('demoEmail').value;
-        await loginBackend(email);
     });
 </script>
 {% endblock %}
