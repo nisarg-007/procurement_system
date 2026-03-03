@@ -683,6 +683,564 @@ flowchart TB
 
 ---
 
+### 📐 Crow's Foot ERD — Module 1: User Identity & Access Control
+
+```mermaid
+erDiagram
+    Roles ||--o{ Users : "1:N assigns"
+    Departments ||--o{ Users : "1:N employs"
+    Departments }o--|| Users : "N:1 managed by"
+
+    Roles {
+        int role_id PK "AUTO INCREMENT"
+        text role_name UK "NOT NULL"
+        text permissions_json "JSON blob"
+    }
+    Departments {
+        int dept_id PK "AUTO INCREMENT"
+        text dept_name "NOT NULL"
+        real budget_allocated "DEFAULT 0"
+        real budget_used "DEFAULT 0"
+        int manager_id FK "→ Users.user_id"
+    }
+    Users {
+        int user_id PK "AUTO INCREMENT"
+        text name "NOT NULL"
+        text email UK "NOT NULL"
+        int role FK "→ Roles.role_id"
+        int department_id FK "→ Departments.dept_id"
+        timestamp created_at "DEFAULT NOW"
+        boolean is_active "DEFAULT 1"
+    }
+```
+
+> **Cardinality:** One Role → Many Users (1:N). One Department → Many Users (1:N). One User manages zero or one Department (recursive FK).
+
+---
+
+### 📐 Crow's Foot ERD — Module 2: Purchase Request Workflow
+
+```mermaid
+erDiagram
+    Users ||--o{ Purchase_Requests : "1:N submits"
+    Departments ||--o{ Purchase_Requests : "1:N belongs to"
+    Purchase_Requests ||--o{ PR_Approvals : "1:N reviewed in"
+    Purchase_Requests ||--o{ PR_Status_History : "1:N tracked in"
+    Users ||--o{ PR_Approvals : "1:N decides"
+    Users ||--o{ PR_Status_History : "1:N changes"
+
+    Purchase_Requests {
+        int pr_id PK "AUTO INCREMENT"
+        int employee_id FK "→ Users.user_id"
+        int dept_id FK "→ Departments.dept_id"
+        text item_name "NOT NULL"
+        text description "nullable"
+        int quantity "NOT NULL"
+        real estimated_cost "per unit"
+        text status "PENDING|APPROVED|REJECTED"
+        timestamp created_at "DEFAULT NOW"
+    }
+    PR_Approvals {
+        int approval_id PK "AUTO INCREMENT"
+        int pr_id FK "→ Purchase_Requests.pr_id"
+        int manager_id FK "→ Users.user_id"
+        text decision "APPROVED or REJECTED"
+        text comments "required"
+        timestamp decided_at "DEFAULT NOW"
+    }
+    PR_Status_History {
+        int history_id PK "AUTO INCREMENT"
+        int pr_id FK "→ Purchase_Requests.pr_id"
+        text old_status "previous state"
+        text new_status "new state"
+        int changed_by FK "→ Users.user_id"
+        timestamp changed_at "DEFAULT NOW"
+    }
+```
+
+> **Cardinality:** One Purchase Request → Many Approvals (1:N, for re-reviews). One PR → Many Status History entries (1:N, full audit trail).
+
+---
+
+### 📐 Crow's Foot ERD — Module 3: Vendor Management
+
+```mermaid
+erDiagram
+    Vendors ||--o{ Vendor_Categories : "1:N categorized"
+    Vendors ||--o{ Contracts : "1:N bound by"
+    Vendors ||--o{ Purchase_Orders : "1:N fulfills"
+    Vendors ||--o{ Invoices : "1:N billed by"
+
+    Vendors {
+        int vendor_id PK "AUTO INCREMENT"
+        text company_name "NOT NULL"
+        text contact_name "nullable"
+        text email "nullable"
+        text phone "nullable"
+        text address "nullable"
+        int rating "1 to 5 stars"
+        boolean is_active "DEFAULT 1"
+    }
+    Vendor_Categories {
+        int vc_id PK "AUTO INCREMENT"
+        int vendor_id FK "→ Vendors.vendor_id"
+        text category_name "e.g. Hardware"
+    }
+    Contracts {
+        int contract_id PK "AUTO INCREMENT"
+        int vendor_id FK "→ Vendors.vendor_id"
+        text start_date "YYYY-MM-DD"
+        text end_date "YYYY-MM-DD"
+        text payment_terms "e.g. NET30"
+        real max_value "contract ceiling"
+        text status "ACTIVE|EXPIRED"
+    }
+```
+
+> **Cardinality:** One Vendor → Many Categories (1:N). One Vendor → Many Contracts (1:N). One Vendor → Many POs (1:N).
+
+---
+
+### 📐 Crow's Foot ERD — Module 4: Order Fulfillment & Finance
+
+```mermaid
+erDiagram
+    Purchase_Requests ||--o{ Purchase_Orders : "1:N converted to"
+    Vendors ||--o{ Purchase_Orders : "1:N fulfills"
+    Users ||--o{ Purchase_Orders : "1:N issued by"
+    Purchase_Orders ||--o{ PO_Line_Items : "1:N contains"
+    Purchase_Orders ||--o{ Goods_Receipt : "1:N received as"
+    Purchase_Orders ||--o{ Invoices : "1:N invoiced as"
+    Invoices ||--o{ Payments : "1:N paid via"
+    Purchase_Orders ||--o{ Budget_Transactions : "1:N deducts"
+    Departments ||--o{ Budget_Transactions : "1:N funds"
+
+    Purchase_Orders {
+        int po_id PK "AUTO INCREMENT"
+        int pr_id FK "→ Purchase_Requests.pr_id"
+        int vendor_id FK "→ Vendors.vendor_id"
+        int procurement_officer_id FK "→ Users.user_id"
+        timestamp issue_date "DEFAULT NOW"
+        text delivery_due_date "YYYY-MM-DD"
+        text status "ISSUED|SHIPPED|INVOICED|PAID"
+        real total_amount "qty x unit price"
+    }
+    PO_Line_Items {
+        int line_id PK "AUTO INCREMENT"
+        int po_id FK "→ Purchase_Orders.po_id"
+        text item_description "line detail"
+        int quantity "units"
+        real unit_price "per item"
+        real total_price "computed"
+    }
+    Goods_Receipt {
+        int gr_id PK "AUTO INCREMENT"
+        int po_id FK "→ Purchase_Orders.po_id"
+        int received_by FK "→ Users.user_id"
+        timestamp received_date "DEFAULT NOW"
+        int quantity_received "actual count"
+        text condition_notes "inspection"
+    }
+    Invoices {
+        int invoice_id PK "AUTO INCREMENT"
+        int po_id FK "→ Purchase_Orders.po_id"
+        int vendor_id FK "→ Vendors.vendor_id"
+        timestamp invoice_date "DEFAULT NOW"
+        text due_date "YYYY-MM-DD"
+        real amount "invoice total"
+        text status "PENDING|PAID"
+    }
+    Payments {
+        int payment_id PK "AUTO INCREMENT"
+        int invoice_id FK "→ Invoices.invoice_id"
+        int paid_by FK "→ Users.user_id"
+        timestamp payment_date "DEFAULT NOW"
+        real amount_paid "disbursed"
+        text payment_method "CHECK|WIRE|ACH"
+        text reference_no "transaction ref"
+    }
+    Budget_Transactions {
+        int txn_id PK "AUTO INCREMENT"
+        int dept_id FK "→ Departments.dept_id"
+        int po_id FK "→ Purchase_Orders.po_id"
+        real amount "debit or credit"
+        text transaction_type "DEBIT|CREDIT"
+        timestamp recorded_at "DEFAULT NOW"
+    }
+```
+
+> **Cardinality:** One PO → Many Line Items (1:N). One PO → Many Goods Receipts (1:N). One Invoice → Many Payments (1:N, for partial payments).
+
+---
+
+### 📐 Crow's Foot ERD — Module 5: System Monitoring & Audit
+
+```mermaid
+erDiagram
+    Users ||--o{ Audit_Log : "1:N generates"
+    Users ||--o{ Notifications : "1:N receives"
+    Users ||--o{ Saved_Reports : "1:N creates"
+
+    Audit_Log {
+        int log_id PK "AUTO INCREMENT"
+        int user_id FK "→ Users.user_id"
+        text action "LOGIN|SUBMIT_PR|etc"
+        text table_affected "target table"
+        timestamp timestamp "Central Time"
+        text ip_address "client IP"
+    }
+    Notifications {
+        int notif_id PK "AUTO INCREMENT"
+        int user_id FK "→ Users.user_id"
+        text message "notification text"
+        boolean is_read "DEFAULT 0"
+        timestamp created_at "DEFAULT NOW"
+        text link_to "URL path"
+    }
+    Saved_Reports {
+        int report_id PK "AUTO INCREMENT"
+        int generated_by FK "→ Users.user_id"
+        text report_type "type identifier"
+        text filters_json "JSON filters"
+        timestamp generated_at "DEFAULT NOW"
+        text file_path "export location"
+    }
+```
+
+---
+
+### 📝 Formal Relational Schema Notation
+
+The following is the **textual relational schema** using standard database notation where **underlined** attributes are primary keys and *italicized* attributes are foreign keys:
+
+```
+Roles (role_id, role_name, permissions_json)
+
+Departments (dept_id, dept_name, budget_allocated, budget_used, manager_id*)
+    manager_id* → Users.user_id
+
+Users (user_id, name, email, role*, department_id*, created_at, is_active)
+    role* → Roles.role_id
+    department_id* → Departments.dept_id
+
+Purchase_Requests (pr_id, employee_id*, dept_id*, item_name, description,
+                   quantity, estimated_cost, status, created_at)
+    employee_id* → Users.user_id
+    dept_id* → Departments.dept_id
+
+PR_Approvals (approval_id, pr_id*, manager_id*, decision, comments, decided_at)
+    pr_id* → Purchase_Requests.pr_id
+    manager_id* → Users.user_id
+
+PR_Status_History (history_id, pr_id*, old_status, new_status,
+                   changed_by*, changed_at)
+    pr_id* → Purchase_Requests.pr_id
+    changed_by* → Users.user_id
+
+Vendors (vendor_id, company_name, contact_name, email, phone, address,
+         rating, is_active)
+
+Vendor_Categories (vc_id, vendor_id*, category_name)
+    vendor_id* → Vendors.vendor_id
+
+Contracts (contract_id, vendor_id*, start_date, end_date, payment_terms,
+           max_value, status)
+    vendor_id* → Vendors.vendor_id
+
+Purchase_Orders (po_id, pr_id*, vendor_id*, procurement_officer_id*,
+                 issue_date, delivery_due_date, status, total_amount)
+    pr_id* → Purchase_Requests.pr_id
+    vendor_id* → Vendors.vendor_id
+    procurement_officer_id* → Users.user_id
+
+PO_Line_Items (line_id, po_id*, item_description, quantity,
+               unit_price, total_price)
+    po_id* → Purchase_Orders.po_id
+
+Goods_Receipt (gr_id, po_id*, received_by*, received_date,
+               quantity_received, condition_notes)
+    po_id* → Purchase_Orders.po_id
+    received_by* → Users.user_id
+
+Invoices (invoice_id, po_id*, vendor_id*, invoice_date, due_date,
+          amount, status)
+    po_id* → Purchase_Orders.po_id
+    vendor_id* → Vendors.vendor_id
+
+Payments (payment_id, invoice_id*, paid_by*, payment_date,
+          amount_paid, payment_method, reference_no)
+    invoice_id* → Invoices.invoice_id
+    paid_by* → Users.user_id
+
+Budget_Transactions (txn_id, dept_id*, po_id*, amount,
+                     transaction_type, recorded_at)
+    dept_id* → Departments.dept_id
+    po_id* → Purchase_Orders.po_id
+
+Notifications (notif_id, user_id*, message, is_read, created_at, link_to)
+    user_id* → Users.user_id
+
+Saved_Reports (report_id, generated_by*, report_type, filters_json,
+               generated_at, file_path)
+    generated_by* → Users.user_id
+
+Audit_Log (log_id, user_id*, action, table_affected, timestamp, ip_address)
+    user_id* → Users.user_id
+```
+
+> **Legend:** `attribute` = column, `attribute*` = foreign key, first attribute in each relation = primary key. All PKs use `INTEGER PRIMARY KEY AUTOINCREMENT`.
+
+---
+
+### 📝 DDL — CREATE TABLE Statements (SQLite)
+
+<details>
+<summary><strong>Click to expand full SQL DDL for all 16 tables</strong></summary>
+
+```sql
+-- ============================================
+-- MODULE 1: USER IDENTITY & ACCESS CONTROL
+-- ============================================
+
+CREATE TABLE Roles (
+    role_id    INTEGER PRIMARY KEY AUTOINCREMENT,
+    role_name  TEXT UNIQUE NOT NULL,
+    permissions_json TEXT
+);
+
+CREATE TABLE Departments (
+    dept_id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    dept_name        TEXT NOT NULL,
+    budget_allocated REAL DEFAULT 0,
+    budget_used      REAL DEFAULT 0,
+    manager_id       INTEGER,
+    FOREIGN KEY (manager_id) REFERENCES Users(user_id)
+);
+
+CREATE TABLE Users (
+    user_id       INTEGER PRIMARY KEY AUTOINCREMENT,
+    name          TEXT NOT NULL,
+    email         TEXT UNIQUE NOT NULL,
+    role          INTEGER,
+    department_id INTEGER,
+    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_active     BOOLEAN DEFAULT 1,
+    FOREIGN KEY (role) REFERENCES Roles(role_id),
+    FOREIGN KEY (department_id) REFERENCES Departments(dept_id)
+);
+
+-- ============================================
+-- MODULE 2: PURCHASE REQUEST WORKFLOW
+-- ============================================
+
+CREATE TABLE Purchase_Requests (
+    pr_id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    employee_id    INTEGER,
+    dept_id        INTEGER,
+    item_name      TEXT NOT NULL,
+    description    TEXT,
+    quantity       INTEGER NOT NULL,
+    estimated_cost REAL,
+    status         TEXT DEFAULT 'PENDING',
+    created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (employee_id) REFERENCES Users(user_id),
+    FOREIGN KEY (dept_id) REFERENCES Departments(dept_id)
+);
+
+CREATE TABLE PR_Approvals (
+    approval_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    pr_id       INTEGER,
+    manager_id  INTEGER,
+    decision    TEXT,
+    comments    TEXT,
+    decided_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (pr_id) REFERENCES Purchase_Requests(pr_id),
+    FOREIGN KEY (manager_id) REFERENCES Users(user_id)
+);
+
+CREATE TABLE PR_Status_History (
+    history_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    pr_id      INTEGER,
+    old_status TEXT,
+    new_status TEXT,
+    changed_by INTEGER,
+    changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (pr_id) REFERENCES Purchase_Requests(pr_id),
+    FOREIGN KEY (changed_by) REFERENCES Users(user_id)
+);
+
+-- ============================================
+-- MODULE 3: VENDOR MANAGEMENT
+-- ============================================
+
+CREATE TABLE Vendors (
+    vendor_id    INTEGER PRIMARY KEY AUTOINCREMENT,
+    company_name TEXT NOT NULL,
+    contact_name TEXT,
+    email        TEXT,
+    phone        TEXT,
+    address      TEXT,
+    rating       INTEGER,
+    is_active    BOOLEAN DEFAULT 1
+);
+
+CREATE TABLE Vendor_Categories (
+    vc_id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    vendor_id     INTEGER,
+    category_name TEXT,
+    FOREIGN KEY (vendor_id) REFERENCES Vendors(vendor_id)
+);
+
+CREATE TABLE Contracts (
+    contract_id  INTEGER PRIMARY KEY AUTOINCREMENT,
+    vendor_id    INTEGER,
+    start_date   TEXT,
+    end_date     TEXT,
+    payment_terms TEXT,
+    max_value    REAL,
+    status       TEXT,
+    FOREIGN KEY (vendor_id) REFERENCES Vendors(vendor_id)
+);
+
+-- ============================================
+-- MODULE 4: ORDER FULFILLMENT
+-- ============================================
+
+CREATE TABLE Purchase_Orders (
+    po_id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    pr_id                  INTEGER,
+    vendor_id              INTEGER,
+    procurement_officer_id INTEGER,
+    issue_date             TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    delivery_due_date      TEXT,
+    status                 TEXT DEFAULT 'ISSUED',
+    total_amount           REAL,
+    FOREIGN KEY (pr_id) REFERENCES Purchase_Requests(pr_id),
+    FOREIGN KEY (vendor_id) REFERENCES Vendors(vendor_id),
+    FOREIGN KEY (procurement_officer_id) REFERENCES Users(user_id)
+);
+
+CREATE TABLE PO_Line_Items (
+    line_id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    po_id            INTEGER,
+    item_description TEXT,
+    quantity         INTEGER,
+    unit_price       REAL,
+    total_price      REAL,
+    FOREIGN KEY (po_id) REFERENCES Purchase_Orders(po_id)
+);
+
+CREATE TABLE Goods_Receipt (
+    gr_id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    po_id             INTEGER,
+    received_by       INTEGER,
+    received_date     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    quantity_received INTEGER,
+    condition_notes   TEXT,
+    FOREIGN KEY (po_id) REFERENCES Purchase_Orders(po_id),
+    FOREIGN KEY (received_by) REFERENCES Users(user_id)
+);
+
+-- ============================================
+-- MODULE 5: FINANCE & PAYMENTS
+-- ============================================
+
+CREATE TABLE Invoices (
+    invoice_id   INTEGER PRIMARY KEY AUTOINCREMENT,
+    po_id        INTEGER,
+    vendor_id    INTEGER,
+    invoice_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    due_date     TEXT,
+    amount       REAL,
+    status       TEXT DEFAULT 'PENDING',
+    FOREIGN KEY (po_id) REFERENCES Purchase_Orders(po_id),
+    FOREIGN KEY (vendor_id) REFERENCES Vendors(vendor_id)
+);
+
+CREATE TABLE Payments (
+    payment_id     INTEGER PRIMARY KEY AUTOINCREMENT,
+    invoice_id     INTEGER,
+    paid_by        INTEGER,
+    payment_date   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    amount_paid    REAL,
+    payment_method TEXT,
+    reference_no   TEXT,
+    FOREIGN KEY (invoice_id) REFERENCES Invoices(invoice_id),
+    FOREIGN KEY (paid_by) REFERENCES Users(user_id)
+);
+
+CREATE TABLE Budget_Transactions (
+    txn_id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    dept_id          INTEGER,
+    po_id            INTEGER,
+    amount           REAL,
+    transaction_type TEXT,
+    recorded_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (dept_id) REFERENCES Departments(dept_id),
+    FOREIGN KEY (po_id) REFERENCES Purchase_Orders(po_id)
+);
+
+-- ============================================
+-- MODULE 6: SYSTEM & MONITORING
+-- ============================================
+
+CREATE TABLE Audit_Log (
+    log_id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id        INTEGER,
+    action         TEXT,
+    table_affected TEXT,
+    timestamp      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    ip_address     TEXT,
+    FOREIGN KEY (user_id) REFERENCES Users(user_id)
+);
+
+CREATE TABLE Notifications (
+    notif_id   INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER,
+    message    TEXT,
+    is_read    BOOLEAN DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    link_to    TEXT,
+    FOREIGN KEY (user_id) REFERENCES Users(user_id)
+);
+
+CREATE TABLE Saved_Reports (
+    report_id    INTEGER PRIMARY KEY AUTOINCREMENT,
+    generated_by INTEGER,
+    report_type  TEXT,
+    filters_json TEXT,
+    generated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    file_path    TEXT,
+    FOREIGN KEY (generated_by) REFERENCES Users(user_id)
+);
+```
+
+</details>
+
+---
+
+### 📊 Cardinality & Participation Summary
+
+| Relationship | Type | Left Entity | Right Entity | Participation |
+|-------------|------|-------------|--------------|---------------|
+| Roles → Users | **1:N** | Roles (1, mandatory) | Users (N, mandatory) | Total both sides |
+| Departments → Users | **1:N** | Departments (1) | Users (N) | Total-Partial |
+| Users → Purchase_Requests | **1:N** | Users (1) | PRs (N, optional) | Total-Partial |
+| Purchase_Requests → PR_Approvals | **1:N** | PRs (1) | Approvals (N) | Total-Partial |
+| Purchase_Requests → PR_Status_History | **1:N** | PRs (1) | History (N) | Total-Partial |
+| Purchase_Requests → Purchase_Orders | **1:1** | PRs (1) | POs (0..1) | Total-Partial |
+| Vendors → Purchase_Orders | **1:N** | Vendors (1) | POs (N) | Total-Partial |
+| Purchase_Orders → PO_Line_Items | **1:N** | POs (1) | Lines (N) | Total-Partial |
+| Purchase_Orders → Goods_Receipt | **1:N** | POs (1) | GRs (N) | Total-Partial |
+| Purchase_Orders → Invoices | **1:N** | POs (1) | Invoices (N) | Total-Partial |
+| Invoices → Payments | **1:N** | Invoices (1) | Payments (N) | Total-Partial |
+| Vendors → Vendor_Categories | **1:N** | Vendors (1) | Categories (N) | Total-Partial |
+| Vendors → Contracts | **1:N** | Vendors (1) | Contracts (N) | Total-Partial |
+| Users → Audit_Log | **1:N** | Users (1) | Logs (N) | Total-Partial |
+| Departments → Budget_Transactions | **1:N** | Depts (1) | Txns (N) | Total-Partial |
+
+---
+
 ## 👥 User Roles & Workflow
 
 ### Complete Procurement Lifecycle
