@@ -10,7 +10,8 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
-DB_PATH = 'procurement.db'
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(BASE_DIR, 'procurement.db')
 TMP_DB_PATH = '/tmp/procurement.db'
 
 def get_db_connection():
@@ -20,8 +21,15 @@ def get_db_connection():
         if not os.path.exists(TMP_DB_PATH):
             if os.path.exists(DB_PATH):
                 shutil.copy2(DB_PATH, TMP_DB_PATH)
+            else:
+                # Fallback if somehow using wrong path
+                alt_path = os.path.join(os.getcwd(), 'procurement.db')
+                if os.path.exists(alt_path):
+                    shutil.copy2(alt_path, TMP_DB_PATH)
         try:
             conn = sqlite3.connect(TMP_DB_PATH)
+            # test if tables exist
+            conn.execute("SELECT count(*) FROM Users")
         except:
             conn = sqlite3.connect(DB_PATH) # fallback
     else:
@@ -84,26 +92,31 @@ def login():
 
 @app.route('/api/auth', methods=['POST'])
 def api_auth():
-    data = request.json
-    email = data.get('email')
-    
-    conn = get_db_connection()
-    user = conn.execute('''
-        SELECT u.*, r.role_name 
-        FROM Users u 
-        JOIN Roles r ON u.role = r.role_id 
-        WHERE u.email = ?
-    ''', (email,)).fetchone()
-    conn.close()
-    
-    if user:
-        user_obj = User(id=user['user_id'], name=user['name'], email=user['email'], 
-                        role_id=user['role'], role_name=user['role_name'], department_id=user['department_id'])
-        login_user(user_obj)
-        log_audit(user['user_id'], 'LOGIN', 'Users')
-        return jsonify({"success": True, "redirect": url_for('dashboard')})
-    else:
-        return jsonify({"success": False, "error": "User email not registered in system."})
+    try:
+        data = request.json
+        email = data.get('email')
+        
+        conn = get_db_connection()
+        user = conn.execute('''
+            SELECT u.*, r.role_name 
+            FROM Users u 
+            JOIN Roles r ON u.role = r.role_id 
+            WHERE u.email = ?
+        ''', (email,)).fetchone()
+        
+        if user:
+            user_obj = User(id=user['user_id'], name=user['name'], email=user['email'], 
+                            role_id=user['role'], role_name=user['role_name'], department_id=user['department_id'])
+            login_user(user_obj)
+            log_audit(user['user_id'], 'LOGIN', 'Users')
+            conn.close()
+            return jsonify({"success": True, "redirect": url_for('dashboard')})
+        else:
+            conn.close()
+            return jsonify({"success": False, "error": "User email not registered in system."})
+    except Exception as e:
+        import traceback
+        return jsonify({"success": False, "error": f"Backend Error: {str(e)}", "trace": traceback.format_exc()})
 
 @app.route('/logout')
 @login_required
