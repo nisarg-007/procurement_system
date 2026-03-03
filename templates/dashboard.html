@@ -1,0 +1,395 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<!-- Shared Status Badge Macro -->
+{% macro status_badge(status) %}
+{% if status == 'PENDING' %}
+<span class="badge badge-pending">PENDING</span>
+{% elif status == 'APPROVED' %}
+<span class="badge badge-approved">APPROVED</span>
+{% elif status == 'REJECTED' %}
+<span class="badge badge-rejected">REJECTED</span>
+{% else %}
+<span class="badge bg-secondary">{{ status }}</span>
+{% endif %}
+{% endmacro %}
+
+<!-- Employee Dashboard -->
+{% if current_user.role_name == 'Employee' %}
+<div class="row">
+    <div class="col-lg-4 mb-4">
+        <div class="glass-card h-100">
+            <h4 class="mb-4 text-white">New Purchase Request</h4>
+            <form action="{{ url_for('submit_pr') }}" method="POST">
+                <div class="mb-3">
+                    <label class="form-label text-muted">Item Name</label>
+                    <input type="text" name="item_name" class="form-control" required placeholder="e.g. Dell XPS 15">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label text-muted">Quantity</label>
+                    <input type="number" name="quantity" class="form-control" required min="1">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label text-muted">Estimated Cost (per unit)</label>
+                    <input type="number" step="0.01" name="cost" class="form-control" required>
+                </div>
+                <div class="mb-4">
+                    <label class="form-label text-muted">Business Justification</label>
+                    <textarea name="description" class="form-control" rows="3" required></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary w-100 py-2">Submit Request</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="col-lg-8 mb-4">
+        <div class="glass-card">
+            <h4 class="mb-4 text-white">Your Request History</h4>
+            <div class="table-responsive">
+                <table class="table table-hover text-white align-middle">
+                    <thead>
+                        <tr>
+                            <th>PR #</th>
+                            <th>Item</th>
+                            <th>Qty</th>
+                            <th>Est. Total</th>
+                            <th>Status</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for req in data.requests %}
+                        <tr>
+                            <td>PR-100{{ req.pr_id }}</td>
+                            <td class="fw-bold">{{ req.item_name }}</td>
+                            <td>{{ req.quantity }}</td>
+                            <td>${{ "%.2f"|format(req.estimated_cost * req.quantity) }}</td>
+                            <td>{{ status_badge(req.status) }}</td>
+                            <td class="text-muted small">{{ req.created_at[:10] }}</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="6" class="text-center text-muted py-4">No requests found.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Manager Dashboard -->
+{% elif current_user.role_name == 'Manager' %}
+<div class="row">
+    <div class="col-lg-4 mb-4">
+        <div class="glass-card text-center py-5">
+            <h2 class="display-5 text-white fw-bold mb-0">${{ "%.2f"|format(data.dept.budget_allocated -
+                data.dept.budget_used) }}</h2>
+            <p class="text-muted mt-2">Remaining Department Budget</p>
+            <div class="progress mt-4 bg-dark" style="height: 8px;">
+                {% set pct = (data.dept.budget_used / data.dept.budget_allocated) * 100 %}
+                <div class="progress-bar bg-info" style="width:{{ pct }}%"></div>
+            </div>
+            <p class="small text-muted mt-2">${{ "%.2f"|format(data.dept.budget_used) }} used of ${{
+                "%.2f"|format(data.dept.budget_allocated) }}</p>
+        </div>
+    </div>
+
+    <div class="col-lg-8 mb-4">
+        <div class="glass-card min-vh-50">
+            <h4 class="mb-4 text-white">Pending Team Approvals</h4>
+            <div class="table-responsive">
+                <table class="table text-white align-middle">
+                    <thead>
+                        <tr>
+                            <th>Req ID</th>
+                            <th>Item</th>
+                            <th>Est. Cost</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for r in data.pending_requests %}
+                        <tr>
+                            <td>PR-100{{ r.pr_id }}</td>
+                            <td>
+                                <strong>{{ r.item_name }}</strong> (x{{ r.quantity }})<br>
+                                <small class="text-muted">{{ r.description }}</small>
+                            </td>
+                            <td>${{ "%.2f"|format(r.estimated_cost * r.quantity) }}</td>
+                            <td>
+                                <form action="{{ url_for('approve_pr', pr_id=r.pr_id) }}" method="POST"
+                                    class="d-flex gap-2">
+                                    <input type="text" name="comments" class="form-control form-control-sm"
+                                        placeholder="Review comment" required>
+                                    <button type="submit" name="decision" value="APPROVED"
+                                        class="btn btn-sm btn-success px-3">Approve</button>
+                                    <button type="submit" name="decision" value="REJECTED"
+                                        class="btn btn-sm btn-outline-danger px-3">Reject</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="4" class="text-center text-muted py-4">You have zero pending approvals.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Procurement Dashboard -->
+{% elif current_user.role_name == 'Procurement' %}
+<div class="row">
+    <div class="col-lg-12 mb-4">
+        <div class="glass-card">
+            <h4 class="mb-4 text-white">Ready for PO Generation</h4>
+            <div class="table-responsive">
+                <table class="table text-white align-middle">
+                    <thead>
+                        <tr>
+                            <th>PR ID</th>
+                            <th>Item Request</th>
+                            <th>Generate Document</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for r in data.approved_requests %}
+                        <tr>
+                            <td>PR-100{{ r.pr_id }}</td>
+                            <td><strong>{{ r.item_name }}</strong><br><small class="text-muted">Qty: {{ r.quantity }} |
+                                    Est: ${{ "%.2f"|format(r.estimated_cost * r.quantity) }}</small></td>
+                            <td>
+                                <form action="{{ url_for('generate_po') }}" method="POST"
+                                    class="d-flex gap-3 align-items-center">
+                                    <input type="hidden" name="pr_id" value="{{ r.pr_id }}">
+                                    <select class="form-select" name="vendor_id" required>
+                                        <option value="" selected disabled>Select Vendor</option>
+                                        {% for v in data.vendors %}
+                                        <option value="{{ v.vendor_id }}">{{ v.company_name }} (★{{ v.rating }})
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                    <input type="date" class="form-control" name="delivery_date" required>
+                                    <button type="submit" class="btn btn-primary text-nowrap">Issue PO</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="3" class="text-center text-muted py-4">All approved requests have been
+                                processed.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active POs -->
+    <div class="col-lg-12 mb-4">
+        <div class="glass-card">
+            <h4 class="mb-4 text-white">Active Purchase Orders Pipeline</h4>
+            <table class="table text-white my-0 align-middle">
+                <thead>
+                    <tr>
+                        <th>PO Number</th>
+                        <th>Vendor</th>
+                        <th>Value</th>
+                        <th>Due Date</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for po in data.pos %}
+                    <tr>
+                        <td class="fw-bold text-info">PO-200{{ po.po_id }}</td>
+                        <td>{{ po.company_name }}</td>
+                        <td>${{ "%.2f"|format(po.total_amount) }}</td>
+                        <td>{{ po.delivery_due_date }}</td>
+                        <td><span class="badge bg-secondary">{{ po.status }}</span></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Vendor Dashboard -->
+{% elif current_user.role_name == 'Vendor' %}
+<div class="row justify-content-center">
+    <div class="col-lg-10 mb-4">
+        <div class="glass-card">
+            <h4 class="mb-4 text-white">Vendor Portal: Open Orders</h4>
+            <table class="table text-white align-middle">
+                <thead>
+                    <tr>
+                        <th>Order #</th>
+                        <th>Value</th>
+                        <th>Delivery Due</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for po in data.pos %}
+                    <tr>
+                        <td class="fw-bold text-info">PO-200{{ po.po_id }}</td>
+                        <td>${{ "%.2f"|format(po.total_amount) }}</td>
+                        <td class="{% if po.status == 'ISSUED' %}text-warning{% endif %}">{{ po.delivery_due_date }}
+                        </td>
+                        <td><span class="badge bg-primary">{{ po.status }}</span></td>
+                        <td>
+                            {% if po.status == 'ISSUED' %}
+                            <form action="{{ url_for('vendor_ship', po_id=po.po_id) }}" method="POST">
+                                <button type="submit" class="btn btn-sm btn-success">Mark Shipped</button>
+                            </form>
+                            {% else %}
+                            <span class="text-muted small">Update Complete</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" class="text-center text-muted py-4">No orders assigned to your company.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Finance -->
+{% elif current_user.role_name == 'Finance' %}
+<div class="row">
+    <div class="col-lg-6 mb-4">
+        <div class="glass-card h-100">
+            <h4 class="mb-4 text-white">Pending Goods Receipts</h4>
+            <p class="text-muted small mb-4">Invoice items that have shipped.</p>
+            <table class="table text-white align-middle">
+                <thead>
+                    <tr>
+                        <th>Receipt ID</th>
+                        <th>PO Ref</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for del in data.deliveries %}
+                    <tr>
+                        <td>GR-500{{ del.gr_id }}</td>
+                        <td>PO-200{{ del.po_id }}</td>
+                        <td>
+                            <form action="{{ url_for('finance_invoice') }}" method="POST">
+                                <input type="hidden" name="po_id" value="{{ del.po_id }}">
+                                <button type="submit" class="btn btn-sm btn-primary">Process Invoice</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="3" class="text-center text-muted">No pending receipts to invoice.</td>
+                    </tr>
+                    {% endfor %}
+                    <!-- For demo purposes, we can show raw POs ready to be invoiced if they are SHIPPED -->
+                    {% if data.deliveries|length == 0 %}
+                    <tr>
+                        <td colspan="3" class="text-center text-muted">
+                            <em>(Wait for Vendor to MARK SHIPPED)</em>
+                        </td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="col-lg-6 mb-4">
+        <div class="glass-card h-100">
+            <h4 class="mb-4 text-white">Accounts Payable</h4>
+            <table class="table text-white align-middle">
+                <thead>
+                    <tr>
+                        <th>INV #</th>
+                        <th>PO Ref</th>
+                        <th>Amount</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for inv in data.invoices %}
+                    <tr>
+                        <td>INV-900{{ inv.invoice_id }}</td>
+                        <td>PO-200{{ inv.po_id }}</td>
+                        <td class="fw-bold">${{ "%.2f"|format(inv.amount) }}</td>
+                        <td><span class="badge bg-secondary">{{ inv.status }}</span></td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4" class="text-center text-muted">No invoices recorded.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Super Admin -->
+{% elif current_user.role_name == 'SuperAdmin' %}
+<div class="row">
+    <div class="col-lg-6 mb-4">
+        <div class="glass-card h-100">
+            <h4 class="mb-4 text-white">Global Department Budgets</h4>
+            <canvas id="budgetChart"></canvas>
+            <script>
+                const ctx = document.getElementById('budgetChart').getContext('2d');
+                new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: [
+                            {% for dept in data.departments %} '{{ dept.dept_name }} (Used)', '{{ dept.dept_name }} (Left)', {% endfor %}
+                        ],
+                    datasets: [{
+                        data: [
+                            {% for dept in data.departments %} {{ dept.budget_used }}, {{ dept.budget_allocated - dept.budget_used }}, {% endfor %}
+                ],
+                    backgroundColor: ['rgb(239, 68, 68)', 'rgb(16, 185, 129)']
+                        }]
+                    },
+                    options: { plugins: { legend: { labels: { color: 'white' } } } }
+                });
+            </script>
+        </div>
+    </div>
+    <div class="col-lg-6 mb-4">
+        <div class="glass-card h-100" style="max-height: 500px; overflow-y: auto;">
+            <h4 class="mb-4 text-white">System Audit Log</h4>
+            <div class="list-group list-group-flush bg-transparent">
+                {% for log in data.audit %}
+                <div class="list-group-item bg-transparent border-secondary ps-0">
+                    <div class="d-flex w-100 justify-content-between">
+                        <h6 class="mb-1 text-white">{{ log.email }} : <span class="text-info">{{ log.action }}</span>
+                        </h6>
+                        <small class="text-muted">{{ log.timestamp[11:19] }}</small>
+                    </div>
+                    <p class="mb-1 text-muted small">Target: {{ log.table_affected }} | IP: {{ log.ip_address }}</p>
+                </div>
+                {% else %}
+                <p class="text-muted">No logs recorded yet.</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}
