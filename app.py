@@ -120,6 +120,9 @@ def dashboard():
     
     if current_user.role_name == 'Employee':
         data['requests'] = conn.execute('SELECT * FROM Purchase_Requests WHERE employee_id = ? ORDER BY created_at DESC', (current_user.id,)).fetchall()
+        data['kpi_total'] = len(data['requests'])
+        data['kpi_approved'] = sum(1 for r in data['requests'] if r['status'] in ('APPROVED', 'PO_ISSUED'))
+        data['kpi_pending'] = sum(1 for r in data['requests'] if r['status'] == 'PENDING')
     
     elif current_user.role_name == 'Manager':
         data['pending_requests'] = conn.execute('''
@@ -127,20 +130,33 @@ def dashboard():
             WHERE dept_id = ? AND status = "PENDING"
         ''', (current_user.department_id,)).fetchall()
         data['dept'] = conn.execute('SELECT * FROM Departments WHERE dept_id = ?', (current_user.department_id,)).fetchone()
+        data['kpi_pending'] = len(data['pending_requests'])
+        data['kpi_budget_total'] = data['dept']['budget_allocated']
+        data['kpi_budget_used'] = data['dept']['budget_used']
 
     elif current_user.role_name == 'Procurement':
         data['approved_requests'] = conn.execute('SELECT * FROM Purchase_Requests WHERE status = "APPROVED"').fetchall()
         data['vendors'] = conn.execute('SELECT * FROM Vendors WHERE is_active = 1').fetchall()
         data['pos'] = conn.execute('SELECT po.*, v.company_name FROM Purchase_Orders po JOIN Vendors v ON po.vendor_id = v.vendor_id').fetchall()
+        data['kpi_to_issue'] = len(data['approved_requests'])
+        data['kpi_active'] = len(data['pos'])
+        data['kpi_value'] = sum(p['total_amount'] for p in data['pos'])
         
     elif current_user.role_name == 'Vendor':
         vendor_info = conn.execute('SELECT vendor_id FROM Vendors WHERE email = ?', (current_user.email,)).fetchone()
+        data['pos'] = []
         if vendor_info:
             data['pos'] = conn.execute('SELECT * FROM Purchase_Orders WHERE vendor_id = ?', (vendor_info['vendor_id'],)).fetchall()
+        data['kpi_open'] = len(data['pos'])
+        data['kpi_to_ship'] = sum(1 for p in data['pos'] if p['status'] == 'ISSUED')
+        data['kpi_value'] = sum(p['total_amount'] for p in data['pos'])
 
     elif current_user.role_name == 'Finance':
         data['deliveries'] = conn.execute('SELECT gr.*, po.vendor_id FROM Goods_Receipt gr JOIN Purchase_Orders po ON gr.po_id = po.po_id WHERE po.status = "SHIPPED"').fetchall()
         data['invoices'] = conn.execute('SELECT * FROM Invoices ORDER BY invoice_id DESC').fetchall()
+        data['kpi_ready'] = len(data['deliveries'])
+        data['kpi_unpaid'] = sum(1 for i in data['invoices'] if i['status'] == 'PENDING')
+        data['kpi_paid_amt'] = sum(i['amount'] for i in data['invoices'] if i['status'] == 'PAID')
 
     elif current_user.role_name == 'SuperAdmin':
         data['departments'] = conn.execute('SELECT * FROM Departments').fetchall()
@@ -149,6 +165,9 @@ def dashboard():
         # SuperAdmin extended analytics logic
         # For simplicity, returning all POs
         data['all_pos'] = conn.execute('SELECT status, COUNT(*) as count FROM Purchase_Orders GROUP BY status').fetchall()
+        data['kpi_depts'] = len(data['departments'])
+        data['kpi_logs'] = sum(1 for _ in data['audit'])
+        data['kpi_pos'] = sum(p['count'] for p in data['all_pos'])
 
     conn.close()
     return render_template('dashboard.html', data=data)

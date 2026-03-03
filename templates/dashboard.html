@@ -112,6 +112,31 @@
 <!-- Manager Dashboard -->
 {% elif current_user.role_name == 'Manager' %}
 <div class="row">
+    <!-- Manager KPIs -->
+    <div class="col-12 mb-4">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <div class="glass-card text-center p-3">
+                    <div class="text-muted text-uppercase small fw-bold tracking-wider">Pending Approvals</div>
+                    <div class="display-6 text-white fw-bold mt-2">{{ data.kpi_pending }}</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="glass-card text-center p-3">
+                    <div class="text-muted text-uppercase small fw-bold tracking-wider">Total Budget</div>
+                    <div class="display-6 text-success fw-bold mt-2">${{ "{:,.0f}".format(data.kpi_budget_total) }}
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="glass-card text-center p-3">
+                    <div class="text-muted text-uppercase small fw-bold tracking-wider">Budget Used</div>
+                    <div class="display-6 text-danger fw-bold mt-2">${{ "{:,.0f}".format(data.kpi_budget_used) }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="col-lg-4 mb-4">
         <div class="glass-card text-center py-5">
             <h2 class="display-5 text-white fw-bold mb-0">${{ "%.2f"|format(data.dept.budget_allocated -
@@ -175,6 +200,30 @@
 <!-- Procurement Dashboard -->
 {% elif current_user.role_name == 'Procurement' %}
 <div class="row">
+    <!-- Procurement KPIs -->
+    <div class="col-12 mb-4">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <div class="glass-card text-center p-3">
+                    <div class="text-muted text-uppercase small fw-bold tracking-wider">Requests To Issue</div>
+                    <div class="display-6 text-info fw-bold mt-2">{{ data.kpi_to_issue }}</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="glass-card text-center p-3">
+                    <div class="text-muted text-uppercase small fw-bold tracking-wider">Active Pipeline</div>
+                    <div class="display-6 text-success fw-bold mt-2">{{ data.kpi_active }}</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="glass-card text-center p-3">
+                    <div class="text-muted text-uppercase small fw-bold tracking-wider">Total Pipeline Value</div>
+                    <div class="display-6 text-warning fw-bold mt-2">${{ "{:,.0f}".format(data.kpi_value) }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="col-lg-12 mb-4">
         <div class="glass-card">
             <h4 class="mb-4 text-white">Ready for PO Generation</h4>
@@ -254,6 +303,30 @@
 <!-- Vendor Dashboard -->
 {% elif current_user.role_name == 'Vendor' %}
 <div class="row justify-content-center">
+    <!-- Vendor KPIs -->
+    <div class="col-lg-10 mb-4">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <div class="glass-card text-center p-3">
+                    <div class="text-muted text-uppercase small fw-bold tracking-wider">Total Orders</div>
+                    <div class="display-6 text-white fw-bold mt-2">{{ data.kpi_open }}</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="glass-card text-center p-3">
+                    <div class="text-muted text-uppercase small fw-bold tracking-wider">Pending Shipment</div>
+                    <div class="display-6 text-warning fw-bold mt-2">{{ data.kpi_to_ship }}</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="glass-card text-center p-3">
+                    <div class="text-muted text-uppercase small fw-bold tracking-wider">Contracted Value</div>
+                    <div class="display-6 text-success fw-bold mt-2">${{ "{:,.0f}".format(data.kpi_value) }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="col-lg-10 mb-4">
         <div class="glass-card">
             <h4 class="mb-4 text-white">Vendor Portal: Open Orders</h4>
@@ -299,6 +372,30 @@
 <!-- Finance -->
 {% elif current_user.role_name == 'Finance' %}
 <div class="row">
+    <!-- Finance KPIs -->
+    <div class="col-12 mb-4">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <div class="glass-card text-center p-3">
+                    <div class="text-muted text-uppercase small fw-bold tracking-wider">Ready for Invoice</div>
+                    <div class="display-6 text-info fw-bold mt-2">{{ data.kpi_ready }}</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="glass-card text-center p-3">
+                    <div class="text-muted text-uppercase small fw-bold tracking-wider">Unpaid Invoices</div>
+                    <div class="display-6 text-warning fw-bold mt-2">{{ data.kpi_unpaid }}</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="glass-card text-center p-3">
+                    <div class="text-muted text-uppercase small fw-bold tracking-wider">Capital Paid Out</div>
+                    <div class="display-6 text-success fw-bold mt-2">${{ "{:,.0f}".format(data.kpi_paid_amt) }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="col-lg-6 mb-4">
         <div class="glass-card h-100">
             <h4 class="mb-4 text-white">Pending Goods Receipts</h4>
@@ -375,7 +472,31 @@
 <!-- Super Admin -->
 {% elif current_user.role_name == 'SuperAdmin' %}
 <div class="row">
-    <div class="col-lg-6 mb-4">
+    <!-- SuperAdmin KPIs -->
+    <div class="col-12 mb-4">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <div class="glass-card text-center p-3">
+                    <div class="text-muted text-uppercase small fw-bold tracking-wider">Operating Departments</div>
+                    <div class="display-6 text-primary fw-bold mt-2">{{ data.kpi_depts }}</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="glass-card text-center p-3">
+                    <div class="text-muted text-uppercase small fw-bold tracking-wider">Total Issued POs</div>
+                    <div class="display-6 text-info fw-bold mt-2">{{ data.kpi_pos }}</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="glass-card text-center p-3">
+                    <div class="text-muted text-uppercase small fw-bold tracking-wider">Recorded Audit Events</div>
+                    <div class="display-6 text-secondary fw-bold mt-2">{{ data.kpi_logs }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4 mb-4">
         <div class="glass-card h-100">
             <h4 class="mb-4 text-white">Global Department Budgets</h4>
             <canvas id="budgetChart"></canvas>
