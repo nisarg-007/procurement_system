@@ -1391,7 +1391,7 @@ procurement_system/
 
 ## 🔑 Test Accounts
 
-All accounts use the password: **`test123`**
+All accounts use the password: **`123456`**
 
 | Email | Role | Access Level |
 |-------|------|-------------|
