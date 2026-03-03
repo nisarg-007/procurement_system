@@ -139,8 +139,8 @@ def dashboard():
             data['pos'] = conn.execute('SELECT * FROM Purchase_Orders WHERE vendor_id = ?', (vendor_info['vendor_id'],)).fetchall()
 
     elif current_user.role_name == 'Finance':
-        data['deliveries'] = conn.execute('SELECT gr.*, po.vendor_id FROM Goods_Receipt gr JOIN Purchase_Orders po ON gr.po_id = po.po_id').fetchall()
-        data['invoices'] = conn.execute('SELECT * FROM Invoices').fetchall()
+        data['deliveries'] = conn.execute('SELECT gr.*, po.vendor_id FROM Goods_Receipt gr JOIN Purchase_Orders po ON gr.po_id = po.po_id WHERE po.status = "SHIPPED"').fetchall()
+        data['invoices'] = conn.execute('SELECT * FROM Invoices ORDER BY invoice_id DESC').fetchall()
 
     elif current_user.role_name == 'SuperAdmin':
         data['departments'] = conn.execute('SELECT * FROM Departments').fetchall()
