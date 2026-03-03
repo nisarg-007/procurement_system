@@ -16,14 +16,14 @@ TMP_DB_PATH = '/tmp/procurement.db'
 def get_db_connection():
     import shutil
     # Vercel serverless environment restricts file writes to /tmp/
-    if os.environ.get('VERCEL') == '1' or os.path.exists('/tmp'):
+    if os.environ.get('VERCEL') == '1':
         if not os.path.exists(TMP_DB_PATH):
             if os.path.exists(DB_PATH):
                 shutil.copy2(DB_PATH, TMP_DB_PATH)
         try:
             conn = sqlite3.connect(TMP_DB_PATH)
         except:
-            conn = sqlite3.connect(DB_PATH) # fallback mostly for windows local
+            conn = sqlite3.connect(DB_PATH) # fallback
     else:
         conn = sqlite3.connect(DB_PATH)
         
