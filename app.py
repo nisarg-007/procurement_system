@@ -199,7 +199,7 @@ def dashboard():
 
     elif current_user.role_name == 'Procurement':
         data['approved_requests'] = conn.execute('SELECT * FROM Purchase_Requests WHERE status = "APPROVED"').fetchall()
-        data['vendors'] = conn.execute('SELECT * FROM Vendors WHERE is_active = 1').fetchall()
+        data['vendors'] = conn.execute("SELECT * FROM Vendors WHERE is_active = TRUE").fetchall()
         data['pos'] = conn.execute('SELECT po.*, v.company_name FROM Purchase_Orders po JOIN Vendors v ON po.vendor_id = v.vendor_id').fetchall()
         data['kpi_to_issue'] = len(data['approved_requests'])
         data['kpi_active'] = len(data['pos'])

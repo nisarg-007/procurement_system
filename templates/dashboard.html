@@ -65,7 +65,8 @@
                                     }})</span></td>
                             <td>${{ "%.2f"|format(req.estimated_cost * req.quantity) }}</td>
                             <td>{{ status_badge(req.status) }}</td>
-                            <td class="text-muted small">{{ req.created_at[:10] }}</td>
+                            <td class="text-muted small">{{ req.created_at.strftime('%Y-%m-%d') if req.created_at is not
+                                string else req.created_at[:10] }}</td>
                         </tr>
                         {% else %}
                         <tr>
@@ -542,7 +543,8 @@
                             </p>
                         </div>
                         <div class="text-end">
-                            <small class="text-muted d-block mb-1">{{ log.timestamp[11:19] }}</small>
+                            <small class="text-muted d-block mb-1">{{ log.timestamp.strftime('%H:%M:%S') if
+                                log.timestamp is not string else log.timestamp[11:19] }}</small>
                             <form action="{{ url_for('clear_log', log_id=log.log_id) }}" method="POST">
                                 <button type="submit"
                                     class="btn btn-xs btn-link text-danger p-0 border-0 text-decoration-none"
