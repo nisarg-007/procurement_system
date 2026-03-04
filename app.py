@@ -1,8 +1,13 @@
 import sqlite3
+import psycopg2
+import psycopg2.extras
 import os
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from datetime import datetime
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = 'super_secret_key_for_dbmt_project'
@@ -14,7 +19,52 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, 'procurement.db')
 TMP_DB_PATH = '/tmp/procurement.db'
 
+class DBWrapper:
+    def __init__(self, connection, is_postgres=False):
+        self.conn = connection
+        self.is_postgres = is_postgres
+        
+    def execute(self, query, params=None):
+        if self.is_postgres:
+            cur = self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+            
+            # Translate SQLite syntax to PostgreSQL syntax
+            if '?' in query:
+                query = query.replace('?', '%s')
+                
+            if 'last_insert_rowid()' in query.lower():
+                query = "SELECT lastval()"
+                
+            query = query.replace('"PENDING"', "'PENDING'")
+            query = query.replace('"APPROVED"', "'APPROVED'")
+            query = query.replace('"PO_ISSUED"', "'PO_ISSUED'")
+            query = query.replace('"SHIPPED"', "'SHIPPED'")
+            query = query.replace('"Shipped by Vendor"', "'Shipped by Vendor'")
+            query = query.replace('"INVOICED"', "'INVOICED'")
+            query = query.replace('"PAID"', "'PAID'")
+            
+            if params is not None:
+                cur.execute(query, params)
+            else:
+                cur.execute(query)
+            return cur
+        else:
+            if params is not None:
+                return self.conn.execute(query, params)
+            return self.conn.execute(query)
+            
+    def commit(self):
+        self.conn.commit()
+        
+    def close(self):
+        self.conn.close()
+
 def get_db_connection():
+    db_url = os.environ.get('DATABASE_URL')
+    if db_url:
+        conn = psycopg2.connect(db_url)
+        return DBWrapper(conn, is_postgres=True)
+
     import shutil
     # Vercel serverless environment restricts file writes to /tmp/
     if os.environ.get('VERCEL') == '1':
@@ -36,7 +86,7 @@ def get_db_connection():
         conn = sqlite3.connect(DB_PATH)
         
     conn.row_factory = sqlite3.Row
-    return conn
+    return DBWrapper(conn, is_postgres=False)
 
 class User(UserMixin):
     def __init__(self, id, name, email, role_id, role_name, department_id):

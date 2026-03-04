@@ -1,17 +1,39 @@
 import sqlite3
 import os
+import psycopg2
+from dotenv import load_dotenv
+
+load_dotenv()
 
 DB_PATH = 'procurement.db'
 
 def create_database():
-    if os.path.exists(DB_PATH):
-        os.remove(DB_PATH)
+    db_url = os.environ.get('DATABASE_URL')
+    if db_url:
+        print("Connecting to PostgreSQL...")
+        conn = psycopg2.connect(db_url)
+        conn.autocommit = True
+        cursor = conn.cursor()
+    else:
+        print("Connecting to SQLite...")
+        if os.path.exists(DB_PATH):
+            os.remove(DB_PATH)
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
         
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
+    def execute_query(query, params=None):
+        if db_url:
+            if '?' in query: query = query.replace('?', '%s')
+            query = query.replace('INTEGER PRIMARY KEY AUTOINCREMENT', 'SERIAL PRIMARY KEY')
+            query = query.replace('BOOLEAN DEFAULT 1', 'BOOLEAN DEFAULT TRUE')
+            query = query.replace('BOOLEAN DEFAULT 0', 'BOOLEAN DEFAULT FALSE')
+        if params:
+            cursor.execute(query, params)
+        else:
+            cursor.execute(query)
 
     # 1. User & Auth
-    cursor.execute('''
+    execute_query('''
     CREATE TABLE Roles (
         role_id INTEGER PRIMARY KEY AUTOINCREMENT,
         role_name TEXT UNIQUE NOT NULL,
@@ -19,7 +41,7 @@ def create_database():
     )
     ''')
     
-    cursor.execute('''
+    execute_query('''
     CREATE TABLE Departments (
         dept_id INTEGER PRIMARY KEY AUTOINCREMENT,
         dept_name TEXT NOT NULL,
@@ -29,7 +51,7 @@ def create_database():
     )
     ''')
 
-    cursor.execute('''
+    execute_query('''
     CREATE TABLE Users (
         user_id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
@@ -43,7 +65,7 @@ def create_database():
     )
     ''')
 
-    cursor.execute('''
+    execute_query('''
     CREATE TABLE Audit_Log (
         log_id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER,
@@ -56,7 +78,7 @@ def create_database():
     ''')
 
     # 2. Purchase Requests
-    cursor.execute('''
+    execute_query('''
     CREATE TABLE Purchase_Requests (
         pr_id INTEGER PRIMARY KEY AUTOINCREMENT,
         employee_id INTEGER,
@@ -72,7 +94,7 @@ def create_database():
     )
     ''')
 
-    cursor.execute('''
+    execute_query('''
     CREATE TABLE PR_Approvals (
         approval_id INTEGER PRIMARY KEY AUTOINCREMENT,
         pr_id INTEGER,
@@ -85,7 +107,7 @@ def create_database():
     )
     ''')
 
-    cursor.execute('''
+    execute_query('''
     CREATE TABLE PR_Status_History (
         history_id INTEGER PRIMARY KEY AUTOINCREMENT,
         pr_id INTEGER,
@@ -99,7 +121,7 @@ def create_database():
     ''')
 
     # 3. Vendors & Contracts
-    cursor.execute('''
+    execute_query('''
     CREATE TABLE Vendors (
         vendor_id INTEGER PRIMARY KEY AUTOINCREMENT,
         company_name TEXT NOT NULL,
@@ -112,7 +134,7 @@ def create_database():
     )
     ''')
 
-    cursor.execute('''
+    execute_query('''
     CREATE TABLE Vendor_Categories (
         vc_id INTEGER PRIMARY KEY AUTOINCREMENT,
         vendor_id INTEGER,
@@ -121,7 +143,7 @@ def create_database():
     )
     ''')
 
-    cursor.execute('''
+    execute_query('''
     CREATE TABLE Contracts (
         contract_id INTEGER PRIMARY KEY AUTOINCREMENT,
         vendor_id INTEGER,
@@ -135,7 +157,7 @@ def create_database():
     ''')
 
     # 4. Purchase Orders
-    cursor.execute('''
+    execute_query('''
     CREATE TABLE Purchase_Orders (
         po_id INTEGER PRIMARY KEY AUTOINCREMENT,
         pr_id INTEGER,
@@ -151,7 +173,7 @@ def create_database():
     )
     ''')
 
-    cursor.execute('''
+    execute_query('''
     CREATE TABLE PO_Line_Items (
         line_id INTEGER PRIMARY KEY AUTOINCREMENT,
         po_id INTEGER,
@@ -163,7 +185,7 @@ def create_database():
     )
     ''')
 
-    cursor.execute('''
+    execute_query('''
     CREATE TABLE Goods_Receipt (
         gr_id INTEGER PRIMARY KEY AUTOINCREMENT,
         po_id INTEGER,
@@ -177,7 +199,7 @@ def create_database():
     ''')
 
     # 5. Invoices & Payments
-    cursor.execute('''
+    execute_query('''
     CREATE TABLE Invoices (
         invoice_id INTEGER PRIMARY KEY AUTOINCREMENT,
         po_id INTEGER,
@@ -191,7 +213,7 @@ def create_database():
     )
     ''')
 
-    cursor.execute('''
+    execute_query('''
     CREATE TABLE Payments (
         payment_id INTEGER PRIMARY KEY AUTOINCREMENT,
         invoice_id INTEGER,
@@ -205,7 +227,7 @@ def create_database():
     )
     ''')
 
-    cursor.execute('''
+    execute_query('''
     CREATE TABLE Budget_Transactions (
         txn_id INTEGER PRIMARY KEY AUTOINCREMENT,
         dept_id INTEGER,
@@ -219,7 +241,7 @@ def create_database():
     ''')
 
     # 6. Notifications & Reporting
-    cursor.execute('''
+    execute_query('''
     CREATE TABLE Notifications (
         notif_id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER,
@@ -231,7 +253,7 @@ def create_database():
     )
     ''')
 
-    cursor.execute('''
+    execute_query('''
     CREATE TABLE Saved_Reports (
         report_id INTEGER PRIMARY KEY AUTOINCREMENT,
         generated_by INTEGER,
@@ -246,10 +268,10 @@ def create_database():
     # Insert Default Roles
     roles = ['Employee', 'Manager', 'Procurement', 'Vendor', 'Finance', 'SuperAdmin']
     for r in roles:
-        cursor.execute("INSERT INTO Roles (role_name) VALUES (?)", (r,))
+        execute_query("INSERT INTO Roles (role_name) VALUES (?)", (r,))
     
     # Insert Default Department
-    cursor.execute("INSERT INTO Departments (dept_name, budget_allocated, budget_used, manager_id) VALUES ('IT Department', 100000, 0, 2)")
+    execute_query("INSERT INTO Departments (dept_name, budget_allocated, budget_used, manager_id) VALUES ('IT Department', 100000, 0, 2)")
 
     # Insert Default Users so they can log in 
     users = [
@@ -261,10 +283,10 @@ def create_database():
         ('Test Admin', 'admin@test.com', 6, 1)
     ]
     for uid, u in enumerate(users):
-        cursor.execute("INSERT INTO Users (name, email, role, department_id) VALUES (?, ?, ?, ?)", u)
+        execute_query("INSERT INTO Users (name, email, role, department_id) VALUES (?, ?, ?, ?)", u)
         
     # Insert a Dummy Vendor entry for the Vendor user
-    cursor.execute("INSERT INTO Vendors (company_name, contact_name, email, phone, address, rating) VALUES ('Tech Supplies Inc', 'Alice', 'vendor@test.com', '123-456', '123 Main st', 5)")
+    execute_query("INSERT INTO Vendors (company_name, contact_name, email, phone, address, rating) VALUES ('Tech Supplies Inc', 'Alice', 'vendor@test.com', '123-456', '123 Main st', 5)")
 
     conn.commit()
     conn.close()
